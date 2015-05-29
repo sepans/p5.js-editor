@@ -129,16 +129,14 @@ module.exports = {
 
 
       try {
-        console.log('contents ',file.contents);
+        //TODO is there any way of doing a shallow parse since we just need global stuff (most likely not)
         var syntax = esprima.parse(file.contents);
 
       }
       catch(e) {
-        console.log('parse error. no need to live-update. ignore', e.message);
         return;
       }
 
-        //console.log('Parsed');
         var funcs = [];
         _.each(syntax.body, function(i) {
             if (i.type == 'FunctionDeclaration') {
@@ -146,16 +144,12 @@ module.exports = {
                 //TODO: is there a better way of getting the content of the function than unparsing it?
                 var unparsed = escodegen.generate(i.body).replace('\n','');
 
-                console.log('function '+ i.id.name +' body '+ unparsed );
                 var func = {name: i.id.name, body: unparsed};
-
-
 
                 funcs.push(func);
                 
                 //TODO comment this and uncomment outer if.
                 if(io) {
-                  console.log('SENDING CHANGES');
                   io.emit('codechange', {globalFunctions: funcs});
 
                 }

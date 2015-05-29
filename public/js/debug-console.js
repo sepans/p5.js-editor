@@ -5,28 +5,15 @@ callback([encoding])}};function encodeAsString(obj){var str="";var nsp=false;str
 (function() {
 
   var socket = io.connect(window.location.origin);
-  console.log('socket', socket);
-  socket.on('connection', function(mysocket) {
 
-  	console.log('mysocket');
-  	
+  //when recieved a list of global function changes from editor, apply them. 
+  socket.on('codechange', function(changeList) {
 
-
-  });
-
-	socket.on('codechange', function(changeList) {
-	  	console.log('CHANGE');
-	  	console.log('functions', changeList.globalFunctions);
-	  	changeList.globalFunctions.forEach(function(func) {
-	  		console.log('func', func);
-	  		console.log('window', window);
-	  		console.log('function name', func.name);
-	  		console.log('current function', window[func.name]);
-	  		var correctedFuncBody = func.body;//.replace('new', func.name);
-	  		console.log('corrected', correctedFuncBody);
-	  		window[func.name] = new Function(correctedFuncBody);
-	  		console.log('new function', window[func.name]);
-	  	});
+  	changeList.globalFunctions.forEach(function(func) {
+  		var correctedFuncBody = func.body;
+  		window[func.name] = new Function(correctedFuncBody);
+  		//TODO refresh page when setup changes.
+  	});
 
 	});
 
