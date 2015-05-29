@@ -32,5 +32,9 @@
   "repository": {
     "type": "git",
     "url": "git://github.com/antiboredom/jside.git"
+  },
+  "dependencies": {
+    "escodegen": "^1.6.1",
+    "esprima": "^2.2.0"
   }
 }

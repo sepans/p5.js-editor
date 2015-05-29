@@ -3,6 +3,13 @@ var Path = nodeRequire('path');
 var os = nodeRequire('os');
 var fs = nodeRequire('fs');
 
+var _ = require('underscore');
+//parsers
+var esprima = require('esprima');
+var escodegen = require('escodegen');
+
+
+
 module.exports = {
   newProject: function() {
     //copy the empty project folder to a temporary directory
@@ -116,12 +123,58 @@ module.exports = {
     });
   },
 
+  codeChanged: function(file) {
+    //if socket is not established don't bother parsing.
+    //if(io) {
+
+
+      try {
+        console.log('contents ',file.contents);
+        var syntax = esprima.parse(file.contents);
+
+      }
+      catch(e) {
+        console.log('parse error. no need to live-update. ignore', e.message);
+        return;
+      }
+
+        //console.log('Parsed');
+        var funcs = [];
+        _.each(syntax.body, function(i) {
+            if (i.type == 'FunctionDeclaration') {
+
+                //TODO: is there a better way of getting the content of the function than unparsing it?
+                var unparsed = escodegen.generate(i.body).replace('\n','');
+
+                console.log('function '+ i.id.name +' body '+ unparsed );
+                var func = {name: i.id.name, body: unparsed};
+
+
+
+                funcs.push(func);
+                
+                //TODO comment this and uncomment outer if.
+                if(io) {
+                  console.log('SENDING CHANGES');
+                  io.emit('codechange', {globalFunctions: funcs});
+
+                }
+            }
+        });
+      
+    //}
+          
+
+
+  },
+
   referenceURL: 'http://p5js.org/reference/'
 
 };
 
 var running = false;
 var url = '';
+var io;
 
 function startServer(path, app, callback) {
   if (running === false) {
@@ -129,7 +182,7 @@ function startServer(path, app, callback) {
     portscanner.findAPortNotInUse(3000, 4000, '127.0.0.1', function(error, port) {
       var staticServer = nodeRequire('node-static');
       var server = nodeRequire('http').createServer(handler);
-      var io = nodeRequire('socket.io')(server);
+      io = nodeRequire('socket.io')(server);
       var file = new staticServer.Server(path, {cache: false});
 
       server.listen(port, function(){
@@ -148,6 +201,7 @@ function startServer(path, app, callback) {
         socket.on('console', function (data) {
           app.debugOut(data.msg, data.num, data.type);
         });
+
       });
     });
 

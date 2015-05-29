@@ -5,6 +5,31 @@ callback([encoding])}};function encodeAsString(obj){var str="";var nsp=false;str
 (function() {
 
   var socket = io.connect(window.location.origin);
+  console.log('socket', socket);
+  socket.on('connection', function(mysocket) {
+
+  	console.log('mysocket');
+  	
+
+
+  });
+
+	socket.on('codechange', function(changeList) {
+	  	console.log('CHANGE');
+	  	console.log('functions', changeList.globalFunctions);
+	  	changeList.globalFunctions.forEach(function(func) {
+	  		console.log('func', func);
+	  		console.log('window', window);
+	  		console.log('function name', func.name);
+	  		console.log('current function', window[func.name]);
+	  		var correctedFuncBody = func.body;//.replace('new', func.name);
+	  		console.log('corrected', correctedFuncBody);
+	  		window[func.name] = new Function(correctedFuncBody);
+	  		console.log('new function', window[func.name]);
+	  	});
+
+	});
+
   var original = window.console;
   window.console = {};
 
@@ -14,6 +39,7 @@ callback([encoding])}};function encodeAsString(obj){var str="";var nsp=false;str
       original[func].apply(original, arguments)
     };
   });
+
 
   window.onerror = function (msg, url, num, column, errorObj) {
     socket.emit('console', { num: num, msg: msg, type: 'error' });
