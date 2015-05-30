@@ -9,6 +9,11 @@ var esprima = require('esprima');
 var escodegen = require('escodegen');
 
 
+//global objects tracked for live coding
+var globalObjs = {};
+
+
+
 
 module.exports = {
   newProject: function() {
@@ -125,7 +130,7 @@ module.exports = {
 
   codeChanged: function(file) {
     //if socket is not established don't bother parsing.
-    //if(io) {
+    if(io) {
 
 
       try {
@@ -137,26 +142,64 @@ module.exports = {
         return;
       }
 
-        var funcs = [];
         _.each(syntax.body, function(i) {
-            if (i.type == 'FunctionDeclaration') {
+            if (i.type === 'FunctionDeclaration') {
+              // Global functions: 
 
-                //TODO: is there a better way of getting the content of the function than unparsing it?
-                var unparsed = escodegen.generate(i.body).replace('\n','');
 
-                var func = {name: i.id.name, body: unparsed};
+              //TODO: is there a better way of getting the content of the function than unparsing it?
+              //var unparsed = escodegen.generate(i.body).replace('\n','');
 
-                funcs.push(func);
-                
-                //TODO comment this and uncomment outer if.
-                if(io) {
-                  io.emit('codechange', {globalFunctions: funcs});
+              //var func = {name: i.id.name, body: unparsed};
+              
+              var name = i.id.name;
+              var value = escodegen.generate(i.body).replace('\n','');;
 
-                }
+              //globalObjs.push(func);
+              
+              //if object doesn't exist or has been changed, update and emit change.
+              if(!globalObjs[name]) {
+                globalObjs[name] = {name: name, type: 'function', value: value};
+              }
+              else if( globalObjs[name].value !== value) {
+                globalObjs[name] = {name: name, type: 'function', value: value};
+                io.emit('codechange', globalObjs[name]);
+              }
+              
+             // io.emit('codechange', {globalFunctions: funcs});
+            }
+            else if (i.type === 'VariableDeclaration') {
+              // Global variables: 
+
+              console.log(i,' value: ', i.declarations[0]);
+              var name = i.declarations[0].id.name;
+              var value = escodegen.generate(i.declarations[0].init);
+
+              // client should know if the value is number to parseFloat string that is received.
+              var isNumber = (i.declarations[0].init.type==='Literal' 
+                                && typeof i.declarations[0].init.value === 'number')  //for numbers
+                            || (i.declarations[0].init.type==='UnaryExpression' 
+                                && typeof i.declarations[0].init.argument.value === 'number'); //for negative numbers
+                            //TODO what else? is there any type of parse tree for numbers?
+              console.log('isNumber ', isNumber, i.declarations[0].init.value , typeof i.declarations[0].init.value);
+              
+              var type = isNumber ? 'number' : 'variable';
+
+              console.log('value', value);
+
+              //if object doesn't exist or has been changed, update and emit change.
+              if(!globalObjs[name]) {
+                globalObjs[name] = {name: name, type: 'variable', value: value};
+              }
+              else if( globalObjs[name].value !== value) {
+                globalObjs[name] = {name: name, type: type , value: value};
+                io.emit('codechange', globalObjs[name]);
+              }
+
             }
         });
       
-    //}
+    }
           
 
 
