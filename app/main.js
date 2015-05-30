@@ -3,11 +3,13 @@ var Path = nodeRequire('path');
 var fs = nodeRequire('fs');
 var os = nodeRequire('os');
 var chokidar = nodeRequire('chokidar');
+var rimdir = nodeRequire('rimraf');
 
 // front-end modules
 var Vue = require('vue');
 var $ = require('jquery');
 var _ = require('underscore');
+var AutoLinker = require('autolinker');
 var keybindings = require('./keybindings');
 var Files = require('./files');
 var menu = require('./menu');
@@ -29,7 +31,8 @@ var appConfig = {
     editor: require('./editor/index'),
     sidebar: require('./sidebar/index'),
     settings: require('./settings/index'),
-    debug: require('./debug/index')
+    debug: require('./debug/index'),
+    tabs: require('./tabs/index')
   },
 
   data: {
@@ -42,13 +45,20 @@ var appConfig = {
     focused: false,
     settings: {},
     showSettings: false,
-    files: []
-    //saveTarget: window 
+    files: [],
+    tabs: [],
+    justSaved: false,
+    askReload: false
   },
 
   computed: {
     projectName: function() {
       return Path.basename(this.projectPath);
+    },
+
+    orientation: function(){
+     var orientation = this.settings.consoleOrientation;
+     return orientation;
     }
   },
 
@@ -75,10 +85,20 @@ var appConfig = {
         this.projectPath = Path.dirname(this.projectPath);
       }
 
+      if (window.FILEPATH && fs.lstatSync(window.FILEPATH).isFile()) {
+        filename = window.FILEPATH;
+      }
+
       // load the project and open the selected file
       var self = this;
       this.loadProject(this.projectPath, function(){
-        if (filename) self.openFile(filename);
+        if (filename) {
+          if (Path.dirname(filename) === self.projectPath) {
+            self.openFile(filename);
+          } else {
+            self.$broadcast('open-nested-file', filename);
+          }
+        }
         gui.Window.get().show();
       });
 
@@ -88,8 +108,8 @@ var appConfig = {
       this.modeFunction('newProject');
       menu.updateRecentFiles(this);
     }
-
-
+    var win = gui.Window.get();
+    win.setMinimumSize(400,400);
   },
 
   methods: {
@@ -151,7 +171,16 @@ var appConfig = {
 
       win.on('focus', function(){
         self.focused = true;
-        menu.resetMenu();
+        self.resetMenu();
+        if (self.askReload) {
+          self.askReload = false;
+          var shouldRefresh = confirm(self.currentFile.path + ' was edited somewhere else. Reload? You will lose any changes.');
+          if (shouldRefresh) {
+              //self.openProject(self.currentFile.path);
+              //gui.Window.get().close(true);
+            window.location = 'index.html';
+          }
+        }
       });
 
       win.on('blur', function(){
@@ -208,7 +237,6 @@ var appConfig = {
         }
         win.window.PATH = path;
       });
-
       return win;
     },
 
@@ -220,6 +248,10 @@ var appConfig = {
         self.watch(path);
         if (typeof callback === 'function') callback();
       });
+    },
+
+    resetMenu: function(){
+      menu.resetMenu();
     },
 
     // watch the project file tree for changes
@@ -245,8 +277,17 @@ var appConfig = {
         Files.removeFromTree(path, self.files);
       }).on('unlinkDir', function(path) {
         Files.removeFromTree(path, self.files);
+      }).on('change', function(path) {
+        if (self.justSaved) {
+          self.justSaved = false; 
+        } else {
+          if (!self.temp) self.askReload = true;
+        }
       });
     },
+
+
+
 
     // close the window, checking for unsaved file changes
     closeProject: function() {
@@ -258,8 +299,7 @@ var appConfig = {
         gui.Window.get().close();
       } else {
         if (this.outputWindow) {
-          this.outputWindow.close(true);
-          this.outputWindow = null;
+          this.toggleRun();
         }
       }
     },
@@ -273,6 +313,7 @@ var appConfig = {
         }
       });
       menu.updateRecentFiles(this, this.projectPath);
+      this.justSaved = true;
     },
 
     saveAs: function(event) {
@@ -303,8 +344,20 @@ var appConfig = {
 
     saveProjectAs: function(event) {
       var path = event.target.files[0].path;
-      this.modeFunction('saveAs', path);
+      var self = this;
+      fs.exists(path, function(existing){
+        if (existing) {
+          rimdir(path, function(error){
+            if (error) throw error;
+            self.modeFunction('saveAs', path);
+          });
+        } else {
+          self.modeFunction('saveAs', path);
+        }
+      });
     },
+
+   
 
     saveFile: function() {
       // if this is a new project then trigger a save-as
@@ -316,9 +369,27 @@ var appConfig = {
       }
     },
 
+    saveFileAs: function(path) {
+      var originalName = Path.basename(path);
+      var newName = prompt('Save file as:', originalName);
+      if (!newName || newName === originalName) return false;
+
+      var self = this;
+      var filename = Path.join(Path.dirname(path), newName);
+      fs.writeFile(filename, this.currentFile.contents, 'utf8', function(err){
+        var f = Files.setup(filename);
+        self.openFile(filename);
+      });
+    },
+
     writeFile: function() {
+      var self = this;
+
+      self.justSaved = true;
+
       fs.writeFileSync(this.currentFile.path, this.currentFile.contents, "utf8");
       this.currentFile.originalContents = this.currentFile.contents;
+
     },
 
     // open up a file - read its contents if it's not already opened
@@ -327,7 +398,6 @@ var appConfig = {
 
       var file = Files.find(this.files, path);
       if (!file) return false;
-
       if (file.open) {
         this.title = file.name;
         this.currentFile = file;
@@ -340,9 +410,35 @@ var appConfig = {
           self.title = file.name;
           self.currentFile = file;
           self.$broadcast('open-file', self.currentFile);
+          self.$broadcast('add-tab', self.currentFile,self.tabs);
+
           if (typeof callback === 'function') callback(file);
         });
       }
+    },
+    
+    closeFile: function(path){
+        // check to see if there are unsaved files
+         var file = Files.find(this.files, path);
+        if (!file) return false;
+        
+
+        if(this.tabs.length==1){
+            var win = gui.Window.get();
+            win.close();
+        }
+        var shouldClose = true;
+        var win = gui.Window.get();
+        if (file.contents != file.originalContents){
+          shouldClose = confirm('You have unsaved changes. Close file and lose changes?');
+        }
+        if (shouldClose) {
+          file.open = false;
+          file.contents = file.originalContents; 
+          this.$broadcast('close-file', file);
+          return true;
+        }
+        return false;
     },
 
     // create a new file and save it in the project path
@@ -386,9 +482,20 @@ var appConfig = {
       fs.rename(path, Path.join(Path.dirname(path), newName));
     },
 
-    debugOut: function(msg, line, type) {
+    debugOut: function(data) {
+      var msg = data.msg;
+      var style = data.style;
+      var line = data.num;
+      var type = data.type;
       if (typeof msg === 'object') msg = JSON.stringify(msg);
-      $('#debug').append('<pre class="'+type+'">' + (line ? line + ': ' : '') + msg + '</pre>');
+      if (style) {
+        msg = msg.replace(/%c/g, '');
+        msg = msg.replace('[', '');
+        msg = msg.replace(']', '');
+      }
+      msg = AutoLinker.link(msg);
+      // console.log(data);
+      $('#debug').append('<div class="'+type+'" style="'+(style ? style : '')+'">' + (line ? line + ': ' : '') + msg + '</div>');
       $('#debug').scrollTop($('#debug')[0].scrollHeight);
     },
 

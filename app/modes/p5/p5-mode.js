@@ -39,6 +39,7 @@ module.exports = {
       self.openFile(Path.join(tempProject, 'sketch.js'));
       gui.Window.get().show();
     });
+
   },
 
   exportProject: function() {
@@ -55,6 +56,9 @@ module.exports = {
     //change file paths
     this.files.forEach(function(file) {
       file.path = Path.join(path, file.name);
+    });
+    this.tabs.forEach(function(tab){
+      tab.path = Path.join(path, tab.name);
     });
 
     this.$broadcast('save-project-as', path);
@@ -98,6 +102,9 @@ module.exports = {
             self.outputWindow = null;
             this.close(true);
           });
+          self.outputWindow.on('focus', function(){
+            self.resetMenu();
+          });
         }
         self.running = true;
       });
@@ -112,7 +119,7 @@ module.exports = {
 
   update: function(callback) {
     var pathPrefix = 'mode_assets/p5/empty_project/libraries/';
-    var urlPrefex = 'https://raw.githubusercontent.com/lmccart/p5.js/master/lib/';
+    var urlPrefex = 'https://raw.githubusercontent.com/processing/p5.js/master/lib/';
 
     var files = [
       { local: pathPrefix + 'p5.js', remote: urlPrefex + 'p5.js' },
@@ -239,7 +246,7 @@ function startServer(path, app, callback) {
 
       io.on('connection', function (socket) {
         socket.on('console', function (data) {
-          app.debugOut(data.msg, data.num, data.type);
+          app.debugOut(data);
         });
 
       });

@@ -9,18 +9,46 @@ var $ = require('jquery');
 module.exports = {
   template: require('./sidebar.html'),
 
+  data: {
+    sidebarWidth: 160
+  },
+  
+  computed: {
+    className: function() {
+      var container = $('#sidebar-container');
+      if (!this.$root.settings.showSidebar) {
+        container.css({
+          width: this.sidebarWidth
+        });
+        ace.resize();
+        return "expanded";
+      } else {
+        this.sidebarWidth = container.width() < 160 ? 160 : container.width();
+        container.css({
+          width: 10
+        });
+        ace.resize();
+        return "";
+      }
+    }
+  },
+
+  ready: function() {
+    this.$on('open-nested-file', this.openNestedFile);
+  },
+
   components: {
 
     file: {
       template: require('./file.html'),
       computed: {
         hidden: function() {
-          return this.name[0] === '.'
+          return this.name[0] === '.';
         },
         icon: function() {
           if (this.ext.match(/(png|jpg|gif|svg|jpeg)$/i)) return 'image';
           else if (this.ext.match(/db$/i)) return 'db';
-          else return 'file'
+          else return 'file';
         },
         className: function() {
           var c = 'item';
@@ -42,15 +70,7 @@ module.exports = {
         open: false,
         icon: 'folder'
       },
-      computed: {
-        hidden: function() {
-          if (!this.$root.settings.showLibs) {
-            return this.name[0] === '.' || this.name === 'node_modules' || this.name === 'libraries';
-          } else {
-            return this.name[0] === '.';
-          }
-        }
-      },
+      computed: {},
       methods: {
         popupMenu: function(target, event) {
           popupMenu.apply(this, arguments);
@@ -68,28 +88,46 @@ module.exports = {
       this.$root.openFile(file.path);
     },
 
-    toggleFolder: function(folder) {
+    toggleFolder: function(folder, cb) {
       var self = this;
       folder.open = !folder.open;
       if (folder.open) {
-        File.list(folder.path, function(files){
+        File.list(folder.path, function(files) {
           folder.children = files;
-          self.$root.watch(folder.path);
+          if (!folder.watching) {
+            folder.watching = true;
+            self.$root.watch(folder.path);
+          }
+          if (typeof cb === 'function') cb();
+        });
+      }
+    },
+
+
+    openNestedFile: function(path) {
+      var self = this;
+      var dirname = Path.dirname(path);
+      var f = _.findWhere(this.$root.files, {path: dirname});
+      if (f) {
+        this.toggleFolder(f, function(){
+          self.$root.openFile(path);
         });
       }
     },
 
     startDrag: function(e) {
       var container = $('#sidebar-container');
-      $(document).on('mousemove', function (e) {
-        container.css({width: e.clientX});
+      $(document).on('mousemove', function(e) {
+        container.css({
+          width: e.clientX
+        });
         ace.resize();
-      }).on('mouseup', function (e) {
+      }).on('mouseup', function(e) {
         $(document).off('mouseup').off('mousemove');
       });
     }
   }
-}
+};
 
 // to do - onely make this once! don't generate each time
 var popupMenu = function(target, e) {
@@ -100,19 +138,19 @@ var popupMenu = function(target, e) {
     menu.append(new gui.MenuItem({
     label: "Reveal",
     click: function() {
-      gui.Shell.showItemInFolder(target.path)
+      gui.Shell.showItemInFolder(target.path);
     }
   }));
   menu.append(new gui.MenuItem({
     label: "Rename",
     click: function() {
-      self.$root.renameFile(target.path);
+      self.$root.newFile(file.type == 'folder' ? file.path : Path.dirname(file.path));
     }
   }));
   menu.append(new gui.MenuItem({
     label: "Delete",
     click: function() {
-      trash([target.path], function(err) {});
+      self.$root.newFolder(file.type == 'folder' ? file.path : Path.dirname(file.path));  
     }
   }));
   }
@@ -124,6 +162,7 @@ var popupMenu = function(target, e) {
       self.$root.newFile(target.type=='folder' ? target.path : self.$root.projectPath);
     }
   }));
+
   menu.append(new gui.MenuItem({
     label: "New folder",
     click: function() {
@@ -131,4 +170,5 @@ var popupMenu = function(target, e) {
     }
   }));
   menu.popup(e.clientX, e.clientY);
-}
+
+};
