@@ -185,13 +185,14 @@ module.exports = {
               // Global variables: 
 
               var name = i.declarations[0].id.name;
-              var value = escodegen.generate(i.declarations[0].init);
+        var value = i.declarations[0].init ? escodegen.generate(i.declarations[0].init) : null;
 
               // client should know if the value is number to parseFloat string that is received.
-              var isNumber = (i.declarations[0].init.type==='Literal' 
+              var isNumber = i.declarations[0].init  && //it is initialized and ... 
+                            ((i.declarations[0].init.type==='Literal' 
                                 && typeof i.declarations[0].init.value === 'number')  //for numbers
                             || (i.declarations[0].init.type==='UnaryExpression' 
-                                && typeof i.declarations[0].init.argument.value === 'number'); //for negative numbers
+                                && typeof i.declarations[0].init.argument.value === 'number')); //for negative numbers
                             //TODO what else? is there any other type of parse tree for numbers?
               
               var type = isNumber ? 'number' : 'variable';
