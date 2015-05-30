@@ -181,11 +181,28 @@ module.exports = {
               }
 
             }
+            else if (i.type ==='ExpressionStatement' && i.expression.left.type === 'MemberExpression' 
+                    && i.expression.right.type === 'FunctionExpression') {
+              // functions declared as expression e.g Obj.prototype.foo = function() {}
+
+              var name = escodegen.generate(i.expression.left);
+              var value = escodegen.generate(i.expression.right.body).replace('\n','');;
+
+              //if object doesn't exist or has been changed, update and emit change.
+              if(!globalObjs[name]) {
+                globalObjs[name] = {name: name, type: 'function', value: value};
+              }
+              else if( globalObjs[name].value !== value) {
+                globalObjs[name] = {name: name, type: 'function', value: value};
+                io.emit('codechange', globalObjs[name]);
+              }
+              
+            }
             else if (i.type === 'VariableDeclaration') {
               // Global variables: 
 
               var name = i.declarations[0].id.name;
-        var value = i.declarations[0].init ? escodegen.generate(i.declarations[0].init) : null;
+              var value = i.declarations[0].init ? escodegen.generate(i.declarations[0].init) : null;
 
               // client should know if the value is number to parseFloat string that is received.
               var isNumber = i.declarations[0].init  && //it is initialized and ... 

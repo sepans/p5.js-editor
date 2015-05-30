@@ -9,6 +9,7 @@ callback([encoding])}};function encodeAsString(obj){var str="";var nsp=false;str
   //when recieved a list of global function changes from editor, apply them. 
   socket.on('codechange', function(change) {
   	var value = change.value;
+
   	if(change.type=='function') {
   		 value = new Function(change.value);
   	}
@@ -21,10 +22,24 @@ callback([encoding])}};function encodeAsString(obj){var str="";var nsp=false;str
   		//TODO display a message saying setup method is not live (because 1. its hard to implement 2. it doesn't make sense)
   	}
   	else {
-  		window[change.name] = value;	
+  		//window[change.name] = value;	
+  		setWindowPropByPath(change.name, value);
   	}
 
-	});
+  });
+
+	function setWindowPropByPath(path, value) {
+	    var schema = window;  /
+	    var pList = path.split('.');
+	    var len = pList.length;
+	    for(var i = 0; i < len-1; i++) {
+	        var elem = pList[i];
+	        if( !schema[elem] ) schema[elem] = {}
+	        schema = schema[elem];
+	    }
+
+	    schema[pList[len-1]] = value;
+	}
 
   var original = window.console;
   window.console = {};
