@@ -82,6 +82,11 @@ module.exports = {
         } else {
           self.outputWindow = self.newWindow(url, {toolbar: true, 'inject-js-start': 'js/debug-console.js'});
           self.outputWindow.on('document-start', function(){
+
+            //call codeChanged to get the globalObjs initialized. for the first time it doen't emit any change.
+            //console.log(self, self.codeChanged);
+            var content = self.currentFile.contents;
+            self.modeFunction('codeChanged', content);
             self.outputWindow.show();
           });
           self.outputWindow.on("close", function(){
@@ -128,14 +133,14 @@ module.exports = {
     });
   },
 
-  codeChanged: function(file) {
+  codeChanged: function(codeContent) {
     //if socket is not established don't bother parsing.
     if(io) {
 
 
       try {
         //TODO is there any way of doing a shallow parse since we just need global stuff (most likely not)
-        var syntax = esprima.parse(file.contents);
+        var syntax = esprima.parse(codeContent);
 
       }
       catch(e) {
@@ -150,12 +155,10 @@ module.exports = {
               //TODO: is there a better way of getting the content of the function than unparsing it?
               //var unparsed = escodegen.generate(i.body).replace('\n','');
 
-              //var func = {name: i.id.name, body: unparsed};
               
               var name = i.id.name;
               var value = escodegen.generate(i.body).replace('\n','');;
 
-              //globalObjs.push(func);
               
               //if object doesn't exist or has been changed, update and emit change.
               if(!globalObjs[name]) {
@@ -165,8 +168,7 @@ module.exports = {
                 globalObjs[name] = {name: name, type: 'function', value: value};
                 io.emit('codechange', globalObjs[name]);
               }
-              
-             // io.emit('codechange', {globalFunctions: funcs});
+
             }
             else if (i.type === 'VariableDeclaration') {
               // Global variables: 
@@ -180,7 +182,7 @@ module.exports = {
                                 && typeof i.declarations[0].init.value === 'number')  //for numbers
                             || (i.declarations[0].init.type==='UnaryExpression' 
                                 && typeof i.declarations[0].init.argument.value === 'number'); //for negative numbers
-                            //TODO what else? is there any type of parse tree for numbers?
+                            //TODO what else? is there any other type of parse tree for numbers?
               console.log('isNumber ', isNumber, i.declarations[0].init.value , typeof i.declarations[0].init.value);
               
               var type = isNumber ? 'number' : 'variable';

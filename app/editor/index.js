@@ -11,7 +11,7 @@ var ace = require('brace');
 // var modes = {
 //   p5: require('../modes/p5/p5-mode')
 // };
-var p5mode = require('../modes/p5/p5-mode');
+//var p5mode = require('../modes/p5/p5-mode');
 
 require('brace/mode/html');
 require('brace/mode/javascript');
@@ -64,7 +64,8 @@ module.exports = {
         doc.on('change', function() {
           var file = Files.find(self.$root.files, fileObject.path);
           if (file) file.contents = doc.getValue();
-          p5mode.codeChanged(file);
+          
+          self.$root.modeFunction('codeChanged', file.contents);
           
 
         });
