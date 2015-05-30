@@ -1,8 +1,6 @@
 
 function setup() {
-
 }
 
 function draw() {
-
 }
