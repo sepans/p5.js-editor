@@ -8,7 +8,6 @@ callback([encoding])}};function encodeAsString(obj){var str="";var nsp=false;str
 
   //when recieved a list of global function changes from editor, apply them. 
   socket.on('codechange', function(change) {
-  	console.log(change);
   	var value = change.value;
   	if(change.type=='function') {
   		 value = new Function(change.value);
@@ -17,9 +16,6 @@ callback([encoding])}};function encodeAsString(obj){var str="";var nsp=false;str
   		 value = parseFloat(change.value);
   	}
 
-  	console.log('value', value, change.type);
-
-  	
 
   	if(change.type==='function' && change.name==='setup') {
   		//TODO display a message saying setup method is not live (because 1. its hard to implement 2. it doesn't make sense)

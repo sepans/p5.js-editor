@@ -3,7 +3,10 @@ var Path = nodeRequire('path');
 var os = nodeRequire('os');
 var fs = nodeRequire('fs');
 
+var Files = require('../../files');
+
 var _ = require('underscore');
+
 //parsers
 var esprima = require('esprima');
 var escodegen = require('escodegen');
@@ -84,8 +87,8 @@ module.exports = {
           self.outputWindow.on('document-start', function(){
 
             //call codeChanged to get the globalObjs initialized. for the first time it doen't emit any change.
-            //console.log(self, self.codeChanged);
             var content = self.currentFile.contents;
+            //TODO get the file by name to make sure sketch.js gets parsed.
             self.modeFunction('codeChanged', content);
             self.outputWindow.show();
           });
@@ -173,7 +176,6 @@ module.exports = {
             else if (i.type === 'VariableDeclaration') {
               // Global variables: 
 
-              console.log(i,' value: ', i.declarations[0]);
               var name = i.declarations[0].id.name;
               var value = escodegen.generate(i.declarations[0].init);
 
@@ -183,11 +185,9 @@ module.exports = {
                             || (i.declarations[0].init.type==='UnaryExpression' 
                                 && typeof i.declarations[0].init.argument.value === 'number'); //for negative numbers
                             //TODO what else? is there any other type of parse tree for numbers?
-              console.log('isNumber ', isNumber, i.declarations[0].init.value , typeof i.declarations[0].init.value);
               
               var type = isNumber ? 'number' : 'variable';
 
-              console.log('value', value);
 
               //if object doesn't exist or has been changed, update and emit change.
               if(!globalObjs[name]) {
