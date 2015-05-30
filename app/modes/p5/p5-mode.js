@@ -12,6 +12,7 @@ var esprima = require('esprima');
 var escodegen = require('escodegen');
 
 
+var liveCodingEnabled = true;
 //global objects tracked for live coding
 var globalObjs = {};
 
@@ -137,8 +138,8 @@ module.exports = {
   },
 
   codeChanged: function(codeContent) {
-    //if socket is not established don't bother parsing.
-    if(io) {
+    //if live coding enabled and socket connection is established (e.g. code is running)
+    if(liveCodingEnabled && io) {
 
 
       try {
