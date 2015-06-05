@@ -181,8 +181,9 @@ module.exports = {
               }
 
             }
-            else if (i.type ==='ExpressionStatement' && i.expression.left.type === 'MemberExpression' 
-                    && i.expression.right.type === 'FunctionExpression') {
+            else if (i.type ==='ExpressionStatement' &&
+                     i.expression.left && i.expression.left.type === 'MemberExpression' &&
+                     i.expression.right && i.expression.right.type === 'FunctionExpression') {
               // functions declared as expression e.g Obj.prototype.foo = function() {}
 
               var name = escodegen.generate(i.expression.left);
