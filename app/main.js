@@ -110,6 +110,9 @@ var appConfig = {
     }
     var win = gui.Window.get();
     win.setMinimumSize(400,400);
+    if(($(window).width() + 100 >= screen.width) || ($(window).height() + 100 >= screen.height)){
+      win.resizeTo((screen.width * 4)/5,(screen.height * 7)/8);
+    }
   },
 
   methods: {
@@ -174,7 +177,7 @@ var appConfig = {
         self.resetMenu();
         if (self.askReload) {
           self.askReload = false;
-          var shouldRefresh = confirm(self.currentFile.path + ' was edited somewhere else. Reload? You will lose any changes.');
+          var shouldRefresh = confirm(self.currentFile.path + ' was edited on the disk. Reload? You will lose any changes.');
           if (shouldRefresh) {
               //self.openProject(self.currentFile.path);
               //gui.Window.get().close(true);
@@ -209,7 +212,7 @@ var appConfig = {
         x: currentWindow.x + 50,
         y: currentWindow.y + 50,
         width: 1024,
-        height: 700,
+        height: 768,
         toolbar: false,
         focus: true,
         show: false
@@ -225,7 +228,7 @@ var appConfig = {
       $('#openFile').val('');
     },
 
-    openProject: function(path) {
+    openProject: function(path, temp) {
       // create the new window
       var win = this.newWindow(this.windowURL);
 
@@ -236,6 +239,9 @@ var appConfig = {
           if (fs.existsSync(sketchPath)) path = sketchPath;
         }
         win.window.PATH = path;
+        if (typeof temp === 'boolean' && temp === true) {
+          win.window.UNSAVED = true;
+        }
       });
       return win;
     },
@@ -488,6 +494,7 @@ var appConfig = {
       var line = data.num;
       var type = data.type;
       if (typeof msg === 'object') msg = JSON.stringify(msg);
+      if (msg === 'Uncaught ReferenceError: require is not defined') return false;
       if (style) {
         msg = msg.replace(/%c/g, '');
         msg = msg.replace('[', '');
@@ -519,6 +526,10 @@ var appConfig = {
 
     toggleSettingsPane: function() {
       this.showSettings = !this.showSettings;
+    },
+
+    toggleSidebar: function() {
+      this.settings.showSidebar = !this.settings.showSidebar;
     },
 
     showHelp: function() {
