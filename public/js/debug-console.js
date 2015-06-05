@@ -11,7 +11,12 @@ callback([encoding])}};function encodeAsString(obj){var str="";var nsp=false;str
   	var value = change.value;
 
   	if(change.type=='function') {
-  		 value = new Function(change.value);
+  		var bodyWithoutBrace = change.value.substring(1, change.value.length-1);
+  		value = new Function(bodyWithoutBrace);
+  		/*
+  		// using eval
+  		value = 'function() ' + change.value;
+  		*/
   	}
   	else if(change.type=='number') {
   		 value = parseFloat(change.value);
@@ -22,14 +27,21 @@ callback([encoding])}};function encodeAsString(obj){var str="";var nsp=false;str
   		//TODO display a message saying setup method is not live (because 1. its hard to implement 2. it doesn't make sense)
   	}
   	else {
-  		//window[change.name] = value;	
+
+  		//console.log(change.name, change.value, value);
   		setWindowPropByPath(change.name, value);
+  		/*
+  		//using eval 
+  		var toEval = change.name + ' = ' + value;
+  		eval(toEval);
+  		*/
+
   	}
 
   });
 
 	function setWindowPropByPath(path, value) {
-	    var schema = window;  /
+	    var schema = window;  
 	    var pList = path.split('.');
 	    var len = pList.length;
 	    for(var i = 0; i < len-1; i++) {
