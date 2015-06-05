@@ -159,6 +159,7 @@ module.exports = {
       }
 
         _.each(syntax.body, function(i) {
+
             if (i.type === 'FunctionDeclaration') {
               // Global functions: 
 
@@ -187,6 +188,7 @@ module.exports = {
             }
             else if (i.type === 'VariableDeclaration') {
               // Global variables: 
+              //console.log(i);
 
               var name = i.declarations[0].id.name;
               var value = i.declarations[0].init ? escodegen.generate(i.declarations[0].init) : null;
@@ -200,6 +202,11 @@ module.exports = {
                             //TODO what else? is there any other type of parse tree for numbers?
               
               var type = isNumber ? 'number' : 'variable';
+
+              if(i.declarations[0].init.type==="ObjectExpression") {
+                //pass object type since it needs to be parsed on client
+                type = 'object';
+              }
 
 
               checkForChangeAndOmit(name, value, type);

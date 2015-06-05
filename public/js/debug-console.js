@@ -10,7 +10,7 @@ callback([encoding])}};function encodeAsString(obj){var str="";var nsp=false;str
   socket.on('codechange', function(change) {
   	var value = change.value;
 
-  	if(change.type=='function') {
+  	if(change.type==='function') {
   		var bodyWithoutBrace = change.value.substring(1, change.value.length-1);
   		value = new Function(bodyWithoutBrace);
   		/*
@@ -18,8 +18,12 @@ callback([encoding])}};function encodeAsString(obj){var str="";var nsp=false;str
   		value = 'function() ' + change.value;
   		*/
   	}
-  	else if(change.type=='number') {
+  	else if(change.type==='number') {
   		 value = parseFloat(change.value);
+  	}
+  	else if(change.type==='object') {
+  		//handling object literals (JSON.parse doesn't work becuase of "s)
+  		value = eval('('+change.value+')'); 
   	}
 
 
@@ -28,7 +32,6 @@ callback([encoding])}};function encodeAsString(obj){var str="";var nsp=false;str
   	}
   	else {
 
-  		//console.log(change.name, change.value, value);
   		setWindowPropByPath(change.name, value);
   		/*
   		//using eval 
