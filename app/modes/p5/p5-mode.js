@@ -164,21 +164,13 @@ module.exports = {
 
 
               //TODO: is there a better way of getting the content of the function than unparsing it?
-              //var unparsed = escodegen.generate(i.body).replace('\n','');
 
               
               var name = i.id.name;
               var value = escodegen.generate(i.body).replace('\n','');;
 
               
-              //if object doesn't exist or has been changed, update and emit change.
-              if(!globalObjs[name]) {
-                globalObjs[name] = {name: name, type: 'function', value: value};
-              }
-              else if( globalObjs[name].value !== value) {
-                globalObjs[name] = {name: name, type: 'function', value: value};
-                io.emit('codechange', globalObjs[name]);
-              }
+              checkForChangeAndOmit(name, value, 'function');
 
             }
             else if (i.type ==='ExpressionStatement' &&
@@ -187,16 +179,10 @@ module.exports = {
               // functions declared as expression e.g Obj.prototype.foo = function() {}
 
               var name = escodegen.generate(i.expression.left);
-              var value = escodegen.generate(i.expression.right.body).replace('\n','');;
+              var value = escodegen.generate(i.expression.right.body).replace('\n','');
 
-              //if object doesn't exist or has been changed, update and emit change.
-              if(!globalObjs[name]) {
-                globalObjs[name] = {name: name, type: 'function', value: value};
-              }
-              else if( globalObjs[name].value !== value) {
-                globalObjs[name] = {name: name, type: 'function', value: value};
-                io.emit('codechange', globalObjs[name]);
-              }
+              checkForChangeAndOmit(name, value, 'function');
+
               
             }
             else if (i.type === 'VariableDeclaration') {
@@ -216,14 +202,8 @@ module.exports = {
               var type = isNumber ? 'number' : 'variable';
 
 
-              //if object doesn't exist or has been changed, update and emit change.
-              if(!globalObjs[name]) {
-                globalObjs[name] = {name: name, type: 'variable', value: value};
-              }
-              else if( globalObjs[name].value !== value) {
-                globalObjs[name] = {name: name, type: type , value: value};
-                io.emit('codechange', globalObjs[name]);
-              }
+              checkForChangeAndOmit(name, value, type);
+
 
             }
         });
@@ -237,6 +217,19 @@ module.exports = {
   referenceURL: 'http://p5js.org/reference/'
 
 };
+
+function checkForChangeAndOmit(name, value, type) {
+
+    //if object doesn't exist or has been changed, update and emit change.
+    if(!globalObjs[name]) {
+      globalObjs[name] = {name: name, type: type, value: value};
+    }
+    else if( globalObjs[name].value !== value) {
+      globalObjs[name] = {name: name, type: type, value: value};
+      io.emit('codechange', globalObjs[name]);
+    }
+
+}
 
 var running = false;
 var url = '';
