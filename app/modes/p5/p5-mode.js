@@ -168,10 +168,13 @@ module.exports = {
 
               
               var name = i.id.name;
-              var value = escodegen.generate(i.body).replace('\n','');;
+              var value = escodegen.generate(i.body).replace('\n','');
 
+              var params = i.params.map(function(item) {
+                return item.name;
+              });
               
-              checkForChangeAndOmit(name, value, 'function');
+              checkForChangeAndOmit(name, 'function', value, params);
 
             }
             else if (i.type ==='ExpressionStatement' &&
@@ -182,7 +185,11 @@ module.exports = {
               var name = escodegen.generate(i.expression.left);
               var value = escodegen.generate(i.expression.right.body).replace('\n','');
 
-              checkForChangeAndOmit(name, value, 'function');
+              var params = i.params.map(function(item) {
+                return item.name;
+              });
+              
+              checkForChangeAndOmit(name, 'function', value, params);
 
               
             }
@@ -209,7 +216,7 @@ module.exports = {
               }
 
 
-              checkForChangeAndOmit(name, value, type);
+              checkForChangeAndOmit(name, type, value);
 
 
             }
@@ -225,14 +232,15 @@ module.exports = {
 
 };
 
-function checkForChangeAndOmit(name, value, type) {
+function checkForChangeAndOmit(name, type, value, params) {
 
     //if object doesn't exist or has been changed, update and emit change.
     if(!globalObjs[name]) {
-      globalObjs[name] = {name: name, type: type, value: value};
+      globalObjs[name] = {name: name, type: type, value: value, params: params};
     }
     else if( globalObjs[name].value !== value) {
-      globalObjs[name] = {name: name, type: type, value: value};
+      globalObjs[name] = {name: name, type: type, value: value, params: params};
+      console.log('emitting', globalObjs[name]);
       io.emit('codechange', globalObjs[name]);
     }
 

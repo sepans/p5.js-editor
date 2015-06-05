@@ -12,7 +12,7 @@ callback([encoding])}};function encodeAsString(obj){var str="";var nsp=false;str
 
   	if(change.type==='function') {
   		var bodyWithoutBrace = change.value.substring(1, change.value.length-1);
-  		value = new Function(bodyWithoutBrace);
+  		value = new Function(change.params, bodyWithoutBrace);
   		/*
   		// using eval
   		value = 'function() ' + change.value;
