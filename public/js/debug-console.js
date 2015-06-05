@@ -31,8 +31,19 @@ callback([encoding])}};function encodeAsString(obj){var str="";var nsp=false;str
   		//TODO display a message saying setup method is not live (because 1. its hard to implement 2. it doesn't make sense)
   	}
   	else {
-
+  		if(change.type==='function') {
+  			//this carches errors in functions (draw or methods called by error)
+  			//it has side effecs (e.g. it being called may change the state of application)
+	  		try {
+	  			value.call(window);
+	  		}
+	  		catch(e) {
+	  			console.error(e.message);
+	  			return;
+	  		}
+	  	}
   		setWindowPropByPath(change.name, value);
+  		
   		/*
   		//using eval 
   		var toEval = change.name + ' = ' + value;
