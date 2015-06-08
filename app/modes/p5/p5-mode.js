@@ -203,7 +203,7 @@ module.exports = {
                 return item.name;
               });
               
-              checkForChangeAndOmit(name, 'function', value, params);
+              checkForChangeAndEmit(name, 'function', value, params);
 
             }
             else if (i.type ==='ExpressionStatement' &&
@@ -218,7 +218,7 @@ module.exports = {
                 return item.name;
               });
               
-              checkForChangeAndOmit(name, 'function', value, params);
+              checkForChangeAndEmit(name, 'function', value, params);
 
               
             }
@@ -245,7 +245,7 @@ module.exports = {
               }
 
 
-              checkForChangeAndOmit(name, type, value);
+              checkForChangeAndEmit(name, type, value);
 
 
             }
@@ -261,7 +261,7 @@ module.exports = {
 
 };
 
-function checkForChangeAndOmit(name, type, value, params) {
+function checkForChangeAndEmit(name, type, value, params) {
 
     //if object doesn't exist or has been changed, update and emit change.
     if(!globalObjs[name]) {
