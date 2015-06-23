@@ -187,6 +187,7 @@ module.exports = {
         return;
       }
 
+        //TODO tranversing syntax tree instead of if/else checks?
         _.each(syntax.body, function(i) {
 
             if (i.type === 'FunctionDeclaration') {
@@ -195,7 +196,6 @@ module.exports = {
 
               //TODO: is there a better way of getting the content of the function than unparsing it?
 
-              
               var name = i.id.name;
               var value = escodegen.generate(i.body).replace('\n','');
 
@@ -214,9 +214,11 @@ module.exports = {
               var name = escodegen.generate(i.expression.left);
               var value = escodegen.generate(i.expression.right.body).replace('\n','');
 
-              var params = i.params.map(function(item) {
-                return item.name;
-              });
+              if(i.right && i.right.params) {
+                var params = i.right.params.map(function(item) {
+                  return item.name;
+                });
+              }
               
               checkForChangeAndEmit(name, 'function', value, params);
 
@@ -224,7 +226,6 @@ module.exports = {
             }
             else if (i.type === 'VariableDeclaration') {
               // Global variables: 
-              //console.log(i);
 
               var name = i.declarations[0].id.name;
               var value = i.declarations[0].init ? escodegen.generate(i.declarations[0].init) : null;
