@@ -239,7 +239,7 @@ module.exports = {
               
               var type = isNumber ? 'number' : 'variable';
 
-              if(i.declarations[0].init.type==="ObjectExpression") {
+              if(i.declarations[0].init  && i.declarations[0].init.type==="ObjectExpression") {
                 //pass object type since it needs to be parsed on client
                 type = 'object';
               }
