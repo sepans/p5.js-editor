@@ -214,8 +214,8 @@ module.exports = {
               var name = escodegen.generate(i.expression.left);
               var value = escodegen.generate(i.expression.right.body).replace('\n','');
 
-              if(i.right && i.right.params) {
-                var params = i.right.params.map(function(item) {
+              if(i.expression.right && i.expression.right.params) {
+                var params = i.expression.right.params.map(function(item) {
                   return item.name;
                 });
               }
@@ -270,7 +270,6 @@ function checkForChangeAndEmit(name, type, value, params) {
     }
     else if( globalObjs[name].value !== value) {
       globalObjs[name] = {name: name, type: type, value: value, params: params};
-      console.log('emitting', globalObjs[name]);
       io.emit('codechange', globalObjs[name]);
     }
 
