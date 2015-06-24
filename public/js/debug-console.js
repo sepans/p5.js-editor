@@ -29,6 +29,9 @@ callback([encoding])}};function encodeAsString(obj){var str="";var nsp=false;str
 
   	if(change.type==='function' && change.name==='setup') {
   		//TODO display a message saying setup method is not live (because 1. its hard to implement 2. it doesn't make sense)
+  		window.setup = value;
+  		setup();
+
   	}
   	else {
   		if(change.type==='function') {
