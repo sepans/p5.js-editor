@@ -48,7 +48,10 @@ var appConfig = {
     files: [],
     tabs: [],
     justSaved: false,
-    askReload: false
+    askReload: false,
+    fileTypes: ['txt', 'html', 'css', 'js', 'json', 'scss', 'xml', 'csv', 'less'],
+    outX: 50,
+    outY: 50
   },
 
   computed: {
@@ -63,6 +66,7 @@ var appConfig = {
   },
 
   ready: function() {
+    windowstate.incrementWindows();
     this.modeFunction('update');
     updater.check();
     keybindings.setup(this);
@@ -116,6 +120,7 @@ var appConfig = {
   },
 
   methods: {
+    //runs a function named func in the mode file currently being used
     modeFunction: function(func, args) {
       var mode = this.$options.mode;
       if (typeof mode[func] === 'function') {
@@ -166,6 +171,11 @@ var appConfig = {
             windowstate.save(self, win);
           }
 
+          windowstate.decrementWindows();
+          if (windowstate.totalWindows() === 0) {
+            gui.App.quit();
+          }
+
           // close this window
           this.close(true);
           win = null;
@@ -179,9 +189,14 @@ var appConfig = {
           self.askReload = false;
           var shouldRefresh = confirm(self.currentFile.path + ' was edited on the disk. Reload? You will lose any changes.');
           if (shouldRefresh) {
-              //self.openProject(self.currentFile.path);
-              //gui.Window.get().close(true);
-            window.location = 'index.html';
+
+            var win = self.newWindow(self.windowURL);
+            windowstate.decrementWindows();
+
+            win.on('document-start', function(){
+              win.window.PATH = self.currentFile.path;
+              gui.Window.get().close(true);
+            });
           }
         }
       });
@@ -208,6 +223,7 @@ var appConfig = {
     // create a new window 50px below current window
     newWindow: function(url, options) {
       var currentWindow = gui.Window.get();
+
       var win = gui.Window.open(url, _.extend({
         x: currentWindow.x + 50,
         y: currentWindow.y + 50,
@@ -401,25 +417,31 @@ var appConfig = {
     // open up a file - read its contents if it's not already opened
     openFile: function(path, callback) {
       var self = this;
+      var re = /(?:\.([^.]+))?$/;
+      var ext = re.exec(path)[1];
 
       var file = Files.find(this.files, path);
       if (!file) return false;
-      if (file.open) {
-        this.title = file.name;
-        this.currentFile = file;
-        this.$broadcast('open-file', this.currentFile);
+      if (self.fileTypes.indexOf(ext) < 0) {
+        window.alert("Unsupported file type. Types we can edit:\n" + self.fileTypes.toString());
       } else {
-        fs.readFile(path, 'utf8', function(err, fileContents) {
-          if (err) throw err;
-          file.contents = file.originalContents = fileContents;
-          file.open = true;
-          self.title = file.name;
-          self.currentFile = file;
-          self.$broadcast('open-file', self.currentFile);
-          self.$broadcast('add-tab', self.currentFile,self.tabs);
+        if (file.open) {
+          this.title = file.name;
+          this.currentFile = file;
+          this.$broadcast('open-file', this.currentFile);
+        } else {
+          fs.readFile(path, 'utf8', function(err, fileContents) {
+            if (err) throw err;
+            file.contents = file.originalContents = fileContents;
+            file.open = true;
+            self.title = file.name;
+            self.currentFile = file;
+            self.$broadcast('open-file', self.currentFile);
+            self.$broadcast('add-tab', self.currentFile,self.tabs);
 
-          if (typeof callback === 'function') callback(file);
-        });
+            if (typeof callback === 'function') callback(file);
+          });
+        }
       }
     },
     
@@ -449,8 +471,16 @@ var appConfig = {
 
     // create a new file and save it in the project path
     newFile: function(basepath) {
-      var title = prompt('File name:');
+      var title = prompt('Choose a file name and type: \nSupported types: ' + this.fileTypes.toString()).replace(/ /g,'');
+      var dotSplit = title.split(".");
+      var re = /(?:\.([^.]+))?$/;
+
       if (!title) return false;
+
+      if (this.fileTypes.indexOf(re.exec(title)[1]) < 0 || (dotSplit.length > 2)){
+        window.alert("unsupported/improper file type selected.\nAutomaticallly adding a .js extension");
+        title = dotSplit[0] + '.js';
+      }
 
       if (typeof basepath === 'undefined') {
         basepath = this.projectPath;
@@ -494,6 +524,7 @@ var appConfig = {
       var line = data.num;
       var type = data.type;
       if (typeof msg === 'object') msg = JSON.stringify(msg);
+      else msg = '' + msg;
       if (msg === 'Uncaught ReferenceError: require is not defined') return false;
       if (style) {
         msg = msg.replace(/%c/g, '');
@@ -540,11 +571,4 @@ var appConfig = {
 
 };
 
-
-windowstate.load(function(createNewProject){
-  if (createNewProject) {
-    var app = new Vue(appConfig);
-  } else {
-    gui.Window.get().close(true);
-  }
-});
+var app = new Vue(appConfig);

@@ -1,5 +1,5 @@
 var gulp = require('gulp');
-var NwBuilder = require('node-webkit-builder');
+var NwBuilder = require('nw-builder');
 var plumber = require('gulp-plumber');
 var sass = require('gulp-sass');
 var rename = require('gulp-rename');
@@ -15,20 +15,48 @@ var fs = require('fs');
 var info = require('./package.json');
 var request = require('request');
 
+var isWin = process.platform.indexOf('win') > -1;
+
 var builderOptions = {
   version: info.devDependencies.nw,
   buildType: 'versioned',
   files: [ './public/**'],
   buildDir: './dist',
-  platforms: ['osx64'],
-  macIcns: './icons/p5js.icns'
+  platforms: ['osx64', 'win64'],
+  macIcns: './icons/p5js.icns',
+  winIco: './icons/p5js.ico',
+  macPlist: {
+    'CFBundleDocumentTypes':[
+      {
+        'CFBundleTypeName': 'js',
+        'CFBundleTypeIconFile': 'p5js.icons',
+        'LSItemContentTypes': ['com.netscape.javascript-source']
+      },
+      {
+        'CFBundleTypeName': 'html',
+        'CFBundleTypeIconFile': 'p5js.icons',
+        'LSItemContentTypes': ['public.html']
+      },
+      {
+        'CFBundleTypeName': 'css',
+        'CFBundleTypeIconFile': 'p5js.icons',
+      },
+      {
+        'CFBundleTypeName': 'Folder',
+        'CFBundleTypeOSTypes': [
+          'fold'
+        ]
+      }
+    ]
+  }
 };
 
-var binaryDir = Path.join(builderOptions.buildDir, info.name + " - v" + info.version, 'osx64');
+var binaryDir = Path.join(builderOptions.buildDir, info.name + " - v" + info.version);
 var latestDir = Path.join(Path.join(builderOptions.buildDir, 'latest'));
 
 var jsPath = ['./app/*.js', './app/**/*.js', './app/**/*.html', './public/index.html'];
 var cssPath = './app/**/*.scss';
+var debugClientPath = './app/debug/client.js';
 
 
 gulp.task('browserify', function() {
@@ -45,6 +73,12 @@ gulp.task('browserify', function() {
     .pipe(gulp.dest('./public/js/'));
 });
 
+gulp.task('injected-js', function(){
+  return gulp.src(['./public/node_modules/socket.io/node_modules/socket.io-client/socket.io.js', debugClientPath])
+    .pipe(concat('debug-console.js'))
+    .pipe(gulp.dest('./public/js/'));
+});
+
 gulp.task('css', function() {
   gulp.src(cssPath)
     .pipe(plumber())
@@ -58,6 +92,7 @@ gulp.task('css', function() {
 gulp.task('watch', function() {
   gulp.watch(jsPath, ['browserify']);
   gulp.watch(cssPath, ['css']);
+  gulp.watch(debugClientPath, ['injected-js']);
 });
 
 function build (cb) {
@@ -81,17 +116,28 @@ function build (cb) {
 function copyFfmpegBuild() {
   console.log('copying ffmpegsumo.so to ./dist');
   gulp.src('./lib/ffmpegsumo.so')
-    .pipe(gulp.dest('./dist/p5 - v0.1.8/osx64/p5.app/Contents/Frameworks/nwjs Framework.framework/Libraries',
+    .pipe(gulp.dest(binaryDir + '/osx64/p5.app/Contents/Frameworks/nwjs Framework.framework/Libraries',
+       {overwrite: true}));
+
+  console.log('copying ffmpegsumo.dll to ./dist');
+  gulp.src('./lib/ffmpegsumo.dll')
+    .pipe(gulp.dest(binaryDir + '/win64',
        {overwrite: true}));
 }
 
 
 // copies the ffmpegsumo.so with mp3/mp4 decoders to nwjs directory for development, assuming npm is already run
 gulp.task('copy-ffmpeg-default', function() {
-  console.log('copying ffmpegsumo.so to ./node_modules');
-  gulp.src('./lib/ffmpegsumo.so')
-    .pipe(gulp.dest('./node_modules/nw/nwjs/nwjs.app/Contents/Frameworks/nwjs Framework.framework/Libraries/',
-       {overwrite: true}));
+  console.log('copying ffmpegsumo to ./node_modules');
+  if (isWin) {
+    gulp.src('./lib/ffmpegsumo.dll')
+      .pipe(gulp.dest('./node_modules/nw/nwjs/',
+         {overwrite: true}));
+  } else {
+    gulp.src('./lib/ffmpegsumo.so')
+      .pipe(gulp.dest('./node_modules/nw/nwjs/nwjs.app/Contents/Frameworks/nwjs Framework.framework/Libraries/',
+         {overwrite: true}));
+    }
 });
 
 
@@ -100,25 +146,39 @@ gulp.task('copy-ffmpeg-default', function() {
 function latest () {
   console.log('Compressing...');
 
-  return gulp.src(binaryDir + '/**').
-    pipe(zip('p5.zip')).
-    pipe(gulp.dest(latestDir)).
-    on('end', function(){
-      console.log('Build compressed');
-    });
+  builderOptions.platforms.forEach(function(p){
+    var output = 'p5-' + (p.indexOf('win') > -1 ? 'win' : 'mac') + '.zip';
+    gulp.src(binaryDir + '/' + p +'/**').
+      pipe(zip(output)).
+      pipe(gulp.dest(latestDir)).
+      on('end', function(){
+        console.log('Build compressed');
+      });
+
+  });
 }
 
 gulp.task('p5', function () {
-  var urls = [
-    'https://raw.githubusercontent.com/processing/p5.js/master/lib/p5.js',
-    'https://raw.githubusercontent.com/processing/p5.js/master/lib/addons/p5.sound.js',
-    'https://raw.githubusercontent.com/processing/p5.js/master/lib/addons/p5.dom.js',
-  ];
+  // which files to download
+  var fileNames = ['p5.js', 'p5.dom.js', 'p5.sound.js'];
 
-  urls.forEach(function(url) {
-    download(url)
-      .pipe(gulp.dest("./public/mode_assets/p5/empty_project/libraries/"));
+  // get latest repo data from github api
+  request({
+    url: 'https://api.github.com/repos/processing/p5.js/releases/latest',
+    headers: {
+      'User-Agent' : 'request'
+    }
+  }, function(error, response, body) {
+    var assets = JSON.parse(body).assets;
+    assets.forEach(function(asset) {
+      if (fileNames.indexOf(asset.name) > -1) {
+        var url = asset.browser_download_url;
+        download(url)
+          .pipe(gulp.dest("./public/mode_assets/p5/empty_project/libraries/"));
+      }
+    })
   });
+
 });
 
 gulp.task('release', function(){
@@ -187,4 +247,4 @@ gulp.task('getExamples', function(){
 gulp.task('build',  build);
 //gulp.task('build', ['nw-build', 'copy-ffmpeg-build']);
 gulp.task('latest', latest);
-gulp.task('default', ['copy-ffmpeg-default', 'css', 'browserify', 'watch']);
+gulp.task('default', ['copy-ffmpeg-default', 'css', 'browserify', 'injected-js', 'watch']);

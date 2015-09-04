@@ -2,6 +2,7 @@ var wrench = nodeRequire('wrench');
 var Path = nodeRequire('path');
 var os = nodeRequire('os');
 var fs = nodeRequire('fs');
+var request = nodeRequire('request');
 var Files = require('../../files');
 
 
@@ -19,12 +20,15 @@ var liveCodingEnabled = true;
 var globalObjs = {};
 
 
-
+var canvasWidth;
+var canvasHeight;
+var prevCanvasWidth;
+var prevCanvasHeight;
 
 module.exports = {
   newProject: function() {
     //copy the empty project folder to a temporary directory
-    var emptyProject = 'mode_assets/p5/empty_project';
+    var emptyProject = Path.join('mode_assets', 'p5', 'empty_project');
     var tempProject = Path.join(os.tmpdir(), 'p5' + Date.now(), 'Untitled');
     wrench.mkdirSyncRecursive(tempProject);
     wrench.copyDirSyncRecursive(emptyProject, tempProject, {
@@ -94,45 +98,102 @@ module.exports = {
 
     this.$broadcast('save-project-as', path);
 
-    this.projectPath = path;
-    //this.$broadcast('open-project', path);
-    this.temp = false;
+    // change the html title tag
+    var indexPath = Path.join(path, 'index.html');
+    var projectTitle = Path.basename(path);
+    var oldProjectTitle = Path.basename(this.projectPath);
 
+    fs.readFile(indexPath, 'utf8', function(err, data){
+      if (!err) {
+        data = data.replace('<title>' + oldProjectTitle + '</title>', '<title>' + projectTitle + '</title>');
+        fs.writeFile(indexPath, data);
+      }
+    });
+
+    this.projectPath = path;
+    this.temp = false;
     this.watch(path);
   },
 
   run: function() {
     var self = this;
     this.saveAll();
+    gui.App.clearCache();
 
     if (this.outputWindow) {
       if (this.settings.runInBrowser) {
         gui.Shell.openExternal(url);
       } else {
         this.outputWindow.reloadIgnoringCache();
+        if(isWin){
+          self.outputWindow.hide();
+          self.outputWindow.show();
+        }
       }
     } else {
-      // gui.App.clearCache();
       startServer(this.projectPath, this, function(url) {
         if (self.settings.runInBrowser) {
           gui.Shell.openExternal(url);
         } else {
-          self.outputWindow = self.newWindow(url, {toolbar: true, 'inject-js-start': 'js/debug-console.js'});
-          self.outputWindow.on('document-start', function(){
+          fs.readFile(Path.join(self.projectPath, 'sketch.js'), function(err, data){
+            var matches = (""+data).match(/createCanvas\((.*),(.*)\)/);
+            canvasWidth = matches && matches[1] ? +matches[1] : 400;
+            canvasHeight = matches && matches[2] ? +matches[2] : 400;
 
-            //call codeChanged to get the globalObjs initialized. for the first time it doen't emit any change.
-            var content = self.currentFile.contents;
-            //TODO get the file by name to make sure sketch.js gets parsed.
-            self.modeFunction('codeChanged', content);
-            self.outputWindow.show();
-          });
-          self.outputWindow.on("close", function(){
-            self.running = false;
-            self.outputWindow = null;
-            this.close(true);
-          });
-          self.outputWindow.on('focus', function(){
-            self.resetMenu();
+            if (!self.outW) self.outW = canvasWidth;
+            if (!self.outH) self.outH = canvasHeight;
+
+            if ((canvasWidth != prevCanvasWidth || canvasHeight != prevCanvasHeight) && !self.resizedOutputWindow) {
+              self.outW = canvasWidth;
+              self.outH = canvasHeight;
+            }
+
+            self.outputWindow = self.newWindow(url, {
+              toolbar: true,
+              'inject-js-start': 'js/debug-console.js',
+              x: self.outX,
+              y: self.outY,
+              width: self.outW,
+              height: self.outH,
+              "page-cache": false
+            });
+
+           self.outputWindow.on('document-start', function(){
+
+              //call codeChanged to get the globalObjs initialized. for the first time it doen't emit any change.
+              var content = self.currentFile.contents;
+              //TODO get the file by name to make sure sketch.js gets parsed.
+              self.modeFunction('codeChanged', content);
+              self.outputWindow.show();
+            });
+            
+           prevCanvasWidth = canvasWidth;
+            prevCanvasHeight = canvasHeight;
+
+            self.outputWindow.on('document-start', function(){
+              self.outputWindow.show();
+            });
+
+            self.outputWindow.on("close", function(){
+              self.outX = self.outputWindow.x;
+              self.outY = self.outputWindow.y;
+              self.outW = self.outputWindow.width;
+
+              // the "-55" appears to fix the growing window issue,
+              // & resulting gasslighting of myself
+              self.outH = self.outputWindow.height - 55;
+              self.running = false;
+              self.outputWindow = null;
+              this.close(true);
+            });
+
+            self.outputWindow.on('focus', function(){
+              self.resetMenu();
+            });
+
+            self.outputWindow.on('resize', function() {
+              self.resizedOutputWindow = true;
+            });
           });
         }
         self.running = true;
@@ -143,34 +204,38 @@ module.exports = {
   stop: function() {
     if (this.outputWindow) {
       this.outputWindow.close();
+    } else {
+      this.running = false;
     }
   },
 
   update: function(callback) {
-    var pathPrefix = 'mode_assets/p5/empty_project/libraries/';
-    var urlPrefex = 'https://raw.githubusercontent.com/processing/p5.js/master/lib/';
+    var url = 'https://api.github.com/repos/processing/p5.js/releases/latest';
+    var libraryPath = Path.join('mode_assets', 'p5', 'empty_project', 'libraries');
+    var fileNames = ['p5.js', 'p5.dom.js', 'p5.sound.js'];
 
-    var files = [
-      { local: pathPrefix + 'p5.js', remote: urlPrefex + 'p5.js' },
-      { local: pathPrefix + 'p5.sound.js', remote: urlPrefex + 'addons/p5.sound.js' },
-      { local: pathPrefix + 'p5.dom.js', remote: urlPrefex + 'addons/p5.dom.js' }
-    ];
+    request({url: url, headers: {'User-Agent': 'request'}}, function(error, response, data){
+      var assets = JSON.parse(data).assets.filter(function(asset){
+        return fileNames.indexOf(asset.name) > -1;
+      });
+      assets.forEach(checkAsset);
+    });
 
-    var checked = 0;
-
-    files.forEach(function(file) {
-      download(file.remote, file.local, function(data){
-        if (data) {
-          fs.writeFile(file.local, data, function(err){
-            if (err) throw err;
-          });
-        }
-        checked ++;
-        if (checked == files.length && typeof callback !== 'undefined') {
-          callback();
+    function checkAsset(asset){
+      var localPath = Path.join(libraryPath, asset.name);
+      getVersion(localPath, function(version){
+        var remoteVersion = asset.tag;
+        if (remoteVersion != version) {
+          downloadAsset(asset.browser_download_url, localPath);
         }
       });
-    });
+    }
+
+    function downloadAsset(remote, local) {
+      request({url: remote, headers: {'User-Agent': 'request'}}, function(error, response, body){
+        fs.writeFile(local, body);
+      });
+    }
   },
 
   codeChanged: function(codeContent) {
@@ -277,16 +342,15 @@ function checkForChangeAndEmit(name, type, value, params) {
 
 var running = false;
 var url = '';
-var io;
+var staticServer = nodeRequire('node-static'), server, io, file;
 
 function startServer(path, app, callback) {
   if (running === false) {
     var portscanner = nodeRequire('portscanner');
     portscanner.findAPortNotInUse(3000, 4000, '127.0.0.1', function(error, port) {
-      var staticServer = nodeRequire('node-static');
-      var server = nodeRequire('http').createServer(handler);
+      server = nodeRequire('http').createServer(handler);
       io = nodeRequire('socket.io')(server);
-      var file = new staticServer.Server(path, {cache: false});
+      file = new staticServer.Server(path, {cache: false});
 
       server.listen(port, function(){
         url = 'http://localhost:' + port;
@@ -310,47 +374,19 @@ function startServer(path, app, callback) {
 
 
   } else {
+    file = new staticServer.Server(path, {cache: false});
     callback(url);
   }
 
 }
 
-function download(url, local, cb) {
-  getLine(local, 0, function(line) {
-    var shouldUpdate = true;
-    var data = '';
-    var lines = [];
-    var request = nodeRequire('https').get(url, function(res) {
-      res.on('data', function(chunk) {
-        data += chunk;
-        lines = data.split('\n');
-        if (lines.length > 1 && line == lines[0]) {
-          shouldUpdate = false;
-          res.destroy();
-        }
-      });
-
-      res.on('end', function() {
-        if (shouldUpdate) {
-          cb(data);
-        } else {
-          cb(null);
-        }
-      })
-    });
-
-    request.on('error', function(e) {
-      console.log("Got error: " + e.message);
-      cb(null);
-    });
-  });
-}
-
-function getLine(filename, lineNo, callback) {
+function getVersion(filename, callback) {
   fs.readFile(filename, function (err, data) {
     if (err) throw err;
 
-    var lines = data.toString('utf-8').split("\n");
-    callback(lines[lineNo]);
+    var line = data.toString('utf-8').split("\n")[0];
+    var version = line.match(/v\d+\.\d+\.\d+/)[0].substring(1);
+    callback(version);
   });
+
 }
