@@ -4,6 +4,8 @@
   window.console = {};
   window._isNodeWebkit = true;
 
+  original.log('I am console');
+
   ["log", "warn", "error"].forEach(function(func) {
     window.console[func] = function(msg) {
       var style = null;
@@ -35,6 +37,11 @@
 
     return false;
   };
+
+  original.log('setting up listener for', window);
+  window.addEventListener("message", function(event) {
+      original.log(e);
+  }, false);
 
   function downloadFile() {
     window.opener.postMessage(JSON.stringify({ downloadFile: arguments }), 'file://');
