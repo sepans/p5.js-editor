@@ -155,7 +155,8 @@ module.exports = {
               y: self.outY,
               width: self.outW,
               height: self.outH,
-              "page-cache": false
+              nodejs: false,
+              'page-cache': false,
             });
 
            self.outputWindow.on('document-start', function(){
@@ -342,14 +343,13 @@ function checkForChangeAndEmit(name, type, value, params) {
 
 var running = false;
 var url = '';
-var staticServer = nodeRequire('node-static'), server, io, file;
+var staticServer = nodeRequire('node-static'), server, file;
 
 function startServer(path, app, callback) {
   if (running === false) {
     var portscanner = nodeRequire('portscanner');
     portscanner.findAPortNotInUse(3000, 4000, '127.0.0.1', function(error, port) {
       server = nodeRequire('http').createServer(handler);
-      io = nodeRequire('socket.io')(server);
       file = new staticServer.Server(path, {cache: false});
 
       server.listen(port, function(){
